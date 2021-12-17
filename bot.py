@@ -118,13 +118,14 @@ def replyToText(update: Update, context: CallbackContext) -> None:
 			statusId = int(parsedId)
 			print("Getting tweet")
 			status = twitterAPI.get_status(statusId, tweet_mode='extended')
+			print(str(status))
 			profileUrl = status.user.profile_image_url.replace("_normal", "")
-			bannerUrl = status.user.profile_banner_url if banner else profileUrl
+			bannerUrl = status.user.profile_banner_url if not status.user.profile_use_background_image and banner else profileUrl
 			title = API.deEmojify(status.user.name)
 			user = "@" + status.user.screen_name
 			content = html.unescape(API.deEmojify(status.full_text))
-			profileImage = API.loadImage(requests.get(profileUrl, stream=True).raw)
-			backgroundImage = API.loadImage(requests.get(bannerUrl, stream=True).raw)
+			profileImage = API.loadImage(requests.get(profileUrl, stream=True).raw if not status.user.default_profile_image else "twitter_default_profile.jpg")
+			backgroundImage = API.loadImage(requests.get(bannerUrl, stream=True).raw if not status.user.default_profile_image else "twitter_default_profile.jpg")
 			print("Converting tweet to image")
 			resultImage = API.tweetToImage(backgroundImage, profileImage, width, height, title, user, content, isDark)
 			print("Loading image into memory")
