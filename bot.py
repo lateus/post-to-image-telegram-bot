@@ -46,32 +46,23 @@ def start(update: Update, context: CallbackContext) -> None:
 	else:
 		update.message.reply_markdown_v2(
 			'''Hi ''' + user.mention_markdown_v2() + '''\!\n'''
-			'''Send a tweet\'s url to convert it to an image\.'''
+			'''Send a tweet\'s link to convert it to an image\.'''
 		)
 
 
 def help_command(update: Update, context: CallbackContext) -> None:
 	"""Send a message when the command /help is issued."""
 	update.message.reply_markdown_v2(
-		'''*Help \- Axie Infinity Tools Bot*\n\n'''
+		'''*Help \- Tweet to Image Bot*\n\n'''
 		'''_How to use?_\n'''
-		'''Send one Axie\'s ID to get basic info\.\n'''
-		'''Send two Axie\'s IDs to simulate breeding\.\n'''
-		'''Send one Axie\'s ID twice to check genes\.\n'''
-		'''Send a ronin address to check balance\.\n'''
-		'''_In a group_\n'''
-		'''You can use command `/breed` followed one or two IDs\. For example `/breed 2975324` or `/breed 1680265 740196`\.\n'''
-		'''The same applies to `/info`, `/slp` and the rest of commands with arguments\.\n'''
-		'''*Note:* When in a group, other bots with access to messages may interfere and consume this bot\'s commands\. To solve that, promote this bot to admin \(it doesn\'t need any permission, so you can disable them all\)\.\n'''
-		'''\n__Commands__\n'''
-		'''`/info id` \- Show basic info of this Axie\n'''
-		'''`/breed id1 id2` \- Simulate breed of these Axies\n'''
-		'''`/breed id` \- Read genes of this Axie\n'''
-		'''`/pic id` \- Get a picture of this Axie\n'''
-		'''`/slp ronin` \- Check the balance of a player\n'''
-		'''`/contribute` \- Contribute to the development of this bot\n'''
-		'''`/help` \- Show this message\n\n'''
-		'''Check [our blog](https://telegra.ph/Axie-Infinity-Tools-Bot-10-21), also available [in Spanish](https://telegra.ph/Axie-Infinity-Tools-Bot-Espa%C3%B1ol-10-21)\.'''
+		'''Send a tweet\'s link\.\n'''
+		'''\n__Customization__\n'''
+		'''Include some additional options \(separated by spaces\) in the message:\n'''
+		'''`w=#` \- Set the width \(example: `w=800` for 800 pixels\)\n'''
+		'''`h=#` \- Set the heigth\n'''
+		'''`blur=#` \- Set the blur level \(default is 5\)\n'''
+		'''`blur_media` \- Blur the edges of the media \(if any\)\n'''
+		'''`no_banner` \- Use the profile picture instead of the banner for the background'''
 	, disable_web_page_preview=True)
 
 
@@ -102,40 +93,54 @@ def replyToText(update: Update, context: CallbackContext) -> None:
 			isDark = " dark" in messageText
 			width = 0
 			height = 0
+			blurRadius = 5
 			if " w=" in messageText:
 				tempIndex = messageText.rindex(" w=") + len(" w=")
-				width = int(''.join(filter(str.isdigit, messageText[tempIndex:tempIndex+4])))
+				width = int(''.join(filter(str.isdigit, messageText[tempIndex:tempIndex+4]))) # 0-9999
 			if " h=" in messageText:
 				tempIndex = messageText.rindex(" h=") + len(" h=")
-				height = int(''.join(filter(str.isdigit, messageText[tempIndex:tempIndex+4])))
+				height = int(''.join(filter(str.isdigit, messageText[tempIndex:tempIndex+4]))) # 0-9999
+			if " blur=" in messageText:
+				tempIndex = messageText.rindex(" blur=") + len(" blur=")
+				blurRadius = int(''.join(filter(str.isdigit, messageText[tempIndex:tempIndex+2]))) # 0-99
 			banner = not " no_banner" in messageText
-			finalStatus  = "FINAL STATUS:\n"
-			finalStatus += "- Theme:  " + ("Dark" if isDark else "Light") + "\n"
-			finalStatus += "- Size:   " + str(width) + "x" + str(height) + "\n"
-			finalStatus += "- Banner: " + ("Yes" if banner else "Not") + "\n"
-			print(finalStatus)
+			blurInMedia = " blur_media" in messageText
 			# do the thing
 			statusId = int(parsedId)
-			print("Getting tweet")
 			status = twitterAPI.get_status(statusId, tweet_mode='extended')
-			print(str(status))
 			profileUrl = status.user.profile_image_url.replace("_normal", "")
-			bannerUrl = status.user.profile_banner_url if not status.user.profile_use_background_image and banner else profileUrl
+			bannerUrl = status.user.profile_banner_url if hasattr(status.user, "profile_banner_url") and banner else profileUrl
 			title = API.deEmojify(status.user.name)
 			user = "@" + status.user.screen_name
 			content = html.unescape(API.deEmojify(status.full_text))
 			profileImage = API.loadImage(requests.get(profileUrl, stream=True).raw if not status.user.default_profile_image else "twitter_default_profile.jpg")
 			backgroundImage = API.loadImage(requests.get(bannerUrl, stream=True).raw if not status.user.default_profile_image else "twitter_default_profile.jpg")
-			print("Converting tweet to image")
-			resultImage = API.tweetToImage(backgroundImage, profileImage, width, height, title, user, content, isDark)
-			print("Loading image into memory")
+			creationDate = status.created_at
+			additionalFooter = "t.me/TweetToImage_bot"
+			searchMediaIn = status.entities
+			mediaImages = []
+			if not "media" in searchMediaIn and hasattr(status, "retweeted_status"):
+				searchMediaIn = status.retweeted_status.entities
+			if "media" in searchMediaIn:
+				for media in searchMediaIn["media"]:
+					mediaUrl = media["media_url"]
+					print("- Found media: " + str(mediaUrl))
+					mediaImages.append(API.loadImage(requests.get(mediaUrl, stream=True).raw))
+			resultImage = API.tweetToImage(backgroundImage, profileImage, width, height, blurRadius, title, user, content, "{:%b %d, %Y}".format(creationDate), additionalFooter, mediaImages, blurInMedia, isDark)
 			# post the image from memory
 			bytes_io = BytesIO()
 			bytes_io.name = "tweet.jpeg"
 			resultImage.save(bytes_io, "JPEG")
 			bytes_io.seek(0)
-			print("Sending reply")
-			update.message.reply_photo(photo = bytes_io)
+			caption  = "*- Size:* " + str(width) + "x" + str(height) + "\n"
+			caption += "*- Theme:* " + ("Dark" if isDark else "Light") + "\n"
+			caption += "*- Custom background:* " + ("Yes" if banner else "No") + "\n"
+			caption += "*- Custom footer:* " + ("Yes" if additionalFooter else "No") + "\n"
+			caption += "*- Blur radius:* " + str(blurRadius) + "\n"
+			caption += "*- Blur in media:* " + ("Yes" if blurInMedia else "No") + "\n\n"
+			caption += "_Type /help for customization options._"
+			caption = caption.replace('.', '\.').replace('#', '\#').replace('~', '\~').replace('>', '\>').replace('-', '\-').replace('+', '\+').replace('=', '\=').replace('[', '\[').replace(']', '\]').replace('{', '\{').replace('}', '\}').replace('(', '\(').replace(')', '\)').replace('!', '\!').replace('?', '\?').replace('|', '\|')
+			update.message.reply_photo(photo = bytes_io, caption=caption, parse_mode = ParseMode.MARKDOWN_V2)
 			print("Done!")
 
 
