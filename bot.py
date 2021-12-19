@@ -46,7 +46,8 @@ def start(update: Update, context: CallbackContext) -> None:
 	else:
 		update.message.reply_markdown_v2(
 			'''Hi ''' + user.mention_markdown_v2() + '''\!\n'''
-			'''Send a tweet\'s link to convert it to an image\.'''
+			'''Send a tweet\'s link to convert it to an image\.\n'''
+			'''Or send /help to check for customization options\.'''
 		)
 
 
@@ -58,11 +59,12 @@ def help_command(update: Update, context: CallbackContext) -> None:
 		'''Send a tweet\'s link\.\n'''
 		'''\n__Customization__\n'''
 		'''Include some additional options \(separated by spaces\) in the message:\n'''
-		'''`w=#` \- Set the width \(example: `w=800` for 800 pixels\)\n'''
-		'''`h=#` \- Set the heigth\n'''
-		'''`blur=#` \- Set the blur level \(default is 5\)\n'''
-		'''`blur_media` \- Blur the edges of the media \(if any\)\n'''
-		'''`no_banner` \- Use the profile picture instead of the banner for the background'''
+		'''• `w=#` \- Set the width \(example: `w=800` for 800 pixels\)\n'''
+		'''• `h=#` \- Set the heigth\n'''
+		'''• `blur=#` \- Set the blur level \(default is 10\)\n'''
+		'''• `blur_media` \- Blur the edges of the media \(if any\)\n'''
+		'''• `no_banner` \- Use the profile picture instead of the banner for the background'''
+		'''• `no_media` \- Don\'t process the tweet\'s media, if any'''
 	, disable_web_page_preview=True)
 
 
@@ -93,7 +95,7 @@ def replyToText(update: Update, context: CallbackContext) -> None:
 			isDark = " dark" in messageText
 			width = 0
 			height = 0
-			blurRadius = 5
+			blurRadius = 10
 			if " w=" in messageText:
 				tempIndex = messageText.rindex(" w=") + len(" w=")
 				width = int(''.join(filter(str.isdigit, messageText[tempIndex:tempIndex+4]))) # 0-9999
@@ -105,6 +107,7 @@ def replyToText(update: Update, context: CallbackContext) -> None:
 				blurRadius = int(''.join(filter(str.isdigit, messageText[tempIndex:tempIndex+2]))) # 0-99
 			banner = not " no_banner" in messageText
 			blurInMedia = " blur_media" in messageText
+			noMedia = " no_media" in messageText
 			# do the thing
 			statusId = int(parsedId)
 			status = twitterAPI.get_status(statusId, tweet_mode='extended')
@@ -119,13 +122,14 @@ def replyToText(update: Update, context: CallbackContext) -> None:
 			additionalFooter = "t.me/TweetToImage_bot"
 			searchMediaIn = status.entities
 			mediaImages = []
-			if not "media" in searchMediaIn and hasattr(status, "retweeted_status"):
-				searchMediaIn = status.retweeted_status.entities
-			if "media" in searchMediaIn:
-				for media in searchMediaIn["media"]:
-					mediaUrl = media["media_url"]
-					print("- Found media: " + str(mediaUrl))
-					mediaImages.append(API.loadImage(requests.get(mediaUrl, stream=True).raw))
+			if not noMedia:
+				if not "media" in searchMediaIn and hasattr(status, "retweeted_status"):
+					searchMediaIn = status.retweeted_status.entities
+				if "media" in searchMediaIn:
+					for media in searchMediaIn["media"]:
+						mediaUrl = media["media_url"]
+						print("- Found media: " + str(mediaUrl))
+						mediaImages.append(API.loadImage(requests.get(mediaUrl, stream=True).raw))
 			resultImage = API.tweetToImage(backgroundImage, profileImage, width, height, blurRadius, title, user, content, "{:%b %d, %Y}".format(creationDate), additionalFooter, mediaImages, blurInMedia, isDark)
 			# post the image from memory
 			bytes_io = BytesIO()
@@ -135,7 +139,7 @@ def replyToText(update: Update, context: CallbackContext) -> None:
 			caption  = "*- Size:* " + str(width) + "x" + str(height) + "\n"
 			caption += "*- Theme:* " + ("Dark" if isDark else "Light") + "\n"
 			caption += "*- Custom background:* " + ("Yes" if banner else "No") + "\n"
-			caption += "*- Custom footer:* " + ("Yes" if additionalFooter else "No") + "\n"
+			# caption += "*- Custom footer:* " + ("Yes" if additionalFooter else "No") + "\n"
 			caption += "*- Blur radius:* " + str(blurRadius) + "\n"
 			caption += "*- Blur in media:* " + ("Yes" if blurInMedia else "No") + "\n\n"
 			caption += "_Type /help for customization options._"

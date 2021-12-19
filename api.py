@@ -97,7 +97,7 @@ def tweetToImage(background: Image.Image, profile: Image.Image, width: int, heig
 	rectangleX = (blurredImage.size[0] - rectangleWidth)//2
 	# the height is calculated using dimensions that will be set later. keep an eye on this:
 	contentHeight = ImageDraw.Draw(background).textsize(getWrappedText(content, contentFont, (rectangleX + rectangleWidth - 20) - (rectangleX + 20 + 80)), contentFont)[1]
-	rectangleHeight = contentHeight + 80 + rectangleMargin # 80 is due to the profile icon
+	rectangleHeight = contentHeight + 80 + 10 + rectangleMargin # 80 is due to the profile icon, 10 is for the footer
 	if mediaImage1:
 		maxMediaWidth  = rectangleWidth - rectangleMargin
 		maxMediaHeight = height - rectangleHeight - 2*rectangleMargin
@@ -180,12 +180,12 @@ def tweetToImage(background: Image.Image, profile: Image.Image, width: int, heig
 	# the date
 	# print("- Creating the date")
 	dateDraw = ImageDraw.Draw(resultImage)
-	dateDraw.text(xy=(profileIconX, rectangleY + rectangleHeight - rectangleMargin//2), text=creationDate, font=dateFont, fill=footerTextColor)
+	dateDraw.text(xy=(profileIconX, rectangleY + rectangleHeight - rectangleMargin//2 - 2), text=creationDate, font=dateFont, fill=footerTextColor)
 
 	# the footer
 	# print("- Creating the footer")
 	footerDraw = ImageDraw.Draw(resultImage)
-	footerDraw.text(xy=(rectangleX + rectangleWidth - footerFont.getlength(additionalFooter) - rectangleMargin//2, rectangleY + rectangleHeight - rectangleMargin//2), text=additionalFooter, font=footerFont, fill=footerTextColor)
+	footerDraw.text(xy=(rectangleX + rectangleWidth - footerFont.getlength(additionalFooter) - rectangleMargin//2, rectangleY + rectangleHeight - rectangleMargin//2 - 2), text=additionalFooter, font=footerFont, fill=footerTextColor)
 
 	# wrapping up
 	# print("- Converting the final image back to RGB")
@@ -212,9 +212,9 @@ def main():
 		mediaUrl = media["media_url"]
 		print("- Found media: " + str(mediaUrl))
 		mediaImages.append(loadImage(requests.get(mediaUrl, stream=True).raw))
-	resultImage = tweetToImage(backgroundImage, profileImage, 800, 800, 5, title, user, content, "{:%b %d, %Y}".format(creationDate), additionalFooter, mediaImages)
+	resultImage = tweetToImage(backgroundImage, profileImage, 500, 500, 10, title, user, content, "{:%b %d, %Y}".format(creationDate), additionalFooter, mediaImages)
 	resultImage.save('result_light.jpg', quality=100)
-	resultImage = tweetToImage(backgroundImage, profileImage, 800, 800, 5, title, user, content, "{:%b %d, %Y}".format(creationDate), additionalFooter, mediaImages, False, True)
+	resultImage = tweetToImage(backgroundImage, profileImage, 500, 500, 10, title, user, content, "{:%b %d, %Y}".format(creationDate), additionalFooter, mediaImages, False, True)
 	resultImage.save('result_dark.jpg', quality=100)
 
 if __name__ == '__main__':
